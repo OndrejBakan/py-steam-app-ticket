@@ -24,7 +24,7 @@ class ByteBuffer:
     def position(self):
         return self.stream.tell()
 
-    def read(self, length=1):
+    def read(self, length: int = 1):
         data = self.stream.read(length)
         return data
 
@@ -40,7 +40,7 @@ class ByteBuffer:
         data = self.read(8)
         return struct.unpack('<Q', data)[0]
 
-    def seek(self, offset, whence):
+    def seek(self, offset: int, whence: int = 0):
         self.stream.seek(offset, whence)
 
 

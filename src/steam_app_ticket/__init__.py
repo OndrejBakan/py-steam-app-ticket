@@ -155,12 +155,3 @@ class DLC:
     def __init__(self):
         self.app_id = None
         self.licenses = None
-
-
-if __name__ == '__main__':
-    app_ticket = AppTicket()
-    app_ticket.parse()
-    app_ticket.validate()
-
-    for dlc in app_ticket.dlc:
-        print(dlc.app_id, dlc.licenses)

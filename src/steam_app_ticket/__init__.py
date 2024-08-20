@@ -1,5 +1,6 @@
 import io
 import os
+import steamid
 import struct
 
 from cryptography.exceptions import InvalidSignature
@@ -106,7 +107,7 @@ class AppTicket:
             raise ValueError
 
         self.version = stream.read_uint32()
-        self.steam_id = stream.read_uint64()
+        self.steam_id = steamid.SteamID(str(stream.read_uint64()))
         self.app_id = stream.read_uint32()
 
         self.ownership_ticket_external_IP = ip_address(stream.read_uint32())

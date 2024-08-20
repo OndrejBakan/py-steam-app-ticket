@@ -12,7 +12,7 @@ from ipaddress import ip_address
 
 class ByteBuffer:
     def __init__(self, data):
-        if type(bytes) is not bytearray:
+        if not isinstance(data, bytearray):
             data = bytearray(data)
 
         self.stream = io.BytesIO(data)
@@ -138,9 +138,27 @@ class AppTicket:
         if (stream.position + 128 == stream.limit):
             self.signature = ticket[stream.position : stream.position + 128]
 
-    def validate(self) -> bool:
-        with open(os.path.join(os.path.dirname(__file__), 'system.pem'), 'rb') as key_file:
-                public_key = serialization.load_pem_public_key(key_file.read())
+    def validate(self, public_key_file_path = None) -> bool:
+        """
+        Validates the ownership ticket part using a public key.
+
+        Args:
+            public_key_file_path (FileDescriptorOrPath): The file path to the public key in PEM format. If None, defaults to 'system.pem' in the current directory.
+
+        Returns:
+            bool: True if the signature is valid, False otherwise.
+        """
+
+        if not public_key_file_path:
+            public_key_file_path = os.path.join(os.path.dirname(__file__), 'system.pem')
+
+        try:
+            with open(public_key_file_path, 'rb') as key_file:
+                try:
+                    public_key = serialization.load_pem_public_key(key_file.read())
+                except Exception as e:
+                    raise e
+
                 try:
                     public_key.verify(
                         self.signature,
@@ -150,6 +168,12 @@ class AppTicket:
                     )
                 except InvalidSignature:
                     return False
+                except Exception:
+                    return False
+        except OSError:
+            return False
+
+        return True
 
 
 class DLC:

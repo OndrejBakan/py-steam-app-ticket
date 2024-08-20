@@ -153,27 +153,23 @@ class AppTicket:
             public_key_file_path = os.path.join(os.path.dirname(__file__), 'system.pem')
 
         try:
-            with open(public_key_file_path, 'rb') as key_file:
-                try:
-                    public_key = serialization.load_pem_public_key(key_file.read())
-                except Exception as e:
-                    raise e
+            with open(public_key_file_path, 'rb') as public_key_file:
+                public_key = serialization.load_pem_public_key(public_key_file.read())
+        except Exception:
+            raise
 
-                try:
-                    public_key.verify(
-                        self.signature,
-                        self.__ticket[self.__ownership_ticket_offset : self.__ownership_ticket_offset + self.__ownership_ticket_length],
-                        padding.PKCS1v15(),
-                        hashes.SHA1()
-                    )
-                except InvalidSignature:
-                    return False
-                except Exception:
-                    return False
-        except OSError:
+        try:
+            public_key.verify(
+                self.signature,
+                self.__ticket[self.__ownership_ticket_offset : self.__ownership_ticket_offset + self.__ownership_ticket_length],
+                padding.PKCS1v15(),
+                hashes.SHA1()
+            )
+            return True
+        except InvalidSignature:
             return False
-
-        return True
+        except Exception:
+            return False
 
 
 class DLC:

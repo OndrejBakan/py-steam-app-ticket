@@ -61,8 +61,8 @@ class AppTicket:
         self.version = None
         self.steam_id = None
         self.app_id = None
-        self.ownership_ticket_external_IP = None
-        self.ownership_ticket_internal_IP = None
+        self.ownership_ticket_external_ip = None
+        self.ownership_ticket_internal_ip = None
         self.ownership_flags = None
         self.ownership_ticket_generated = None
         self.ownership_ticket_expires = None

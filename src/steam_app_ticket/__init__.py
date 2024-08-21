@@ -1,13 +1,39 @@
+import collections
 import io
 import os
 import steamid
 import struct
+import typing
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from datetime import datetime
-from ipaddress import ip_address
+from ipaddress import ip_address, IPv4Address, IPv6Address
+
+
+class DLC(typing.NamedTuple):
+    app_id: int
+    licenses: list[int]
+
+
+class AppTicket(typing.NamedTuple):
+    auth_ticket: bytes
+    gc_token: str
+    token_generated: datetime
+    session_external_ip: IPv4Address|IPv6Address
+    client_connection_time: int
+    client_connection_count: int
+    version: int
+    steam_id: steamid.SteamID
+    app_id: int
+    ownership_ticket_external_ip: IPv4Address|IPv6Address
+    ownership_ticket_internal_ip: IPv4Address|IPv6Address
+    ownership_flags: int
+    ownership_ticket_generated: datetime
+    ownership_ticket_expires: datetime
+    licenses: list[int]
+    dlc: list[DLC]
 
 
 class ByteBuffer:
@@ -44,6 +70,8 @@ class ByteBuffer:
     def seek(self, offset: int, whence: int = 0):
         self.stream.seek(offset, whence)
 
+    def skip(self, offset: int):
+        self.stream.seek(offset, os.SEEK_CUR)
 
 class AppTicket:
     def __init__(self):
@@ -81,20 +109,20 @@ class AppTicket:
             self.auth_ticket = ticket[stream.position - 4 : stream.position - 4 + 52]
 
             self.gc_token = stream.read_uint64()
-            stream.seek(8, 1) # SteamID
+            stream.skip(8) # SteamID
             self.token_generated = datetime.fromtimestamp(stream.read_uint32())
             self.session_header = stream.read_uint32()
-            stream.seek(4, 1) # unknown 1
-            stream.seek(4, 1) # unknown 2
+            stream.skip(4) # unknown 1
+            stream.skip(4) # unknown 2
             self.session_external_ip = ip_address(stream.read_uint32())
-            stream.seek(4, 1) # filler
+            stream.skip(4) # filler
             self.client_connection_time = stream.read_uint32()
             self.client_connection_count = stream.read_uint32()
 
-            if (stream.read_uint32() + stream.position != len(ticket)):
-                raise ValueError
+            if stream.read_uint32() + stream.position != len(ticket):
+                raise ValueError()
         else:
-            stream.seek(-4, 1)
+            stream.seek(-4, os.SEEK_CUR)
 
         self.__ownership_ticket_offset = stream.position
         self.__ownership_ticket_length = stream.read_uint32()
@@ -104,7 +132,7 @@ class AppTicket:
         ) and (
             self.__ownership_ticket_offset + self.__ownership_ticket_length + 128 != stream.limit
         ):
-            raise ValueError
+            raise ValueError()
 
         self.version = stream.read_uint32()
         self.steam_id = steamid.SteamID(str(stream.read_uint64()))
@@ -116,26 +144,17 @@ class AppTicket:
         self.ownership_ticket_generated = datetime.fromtimestamp(stream.read_uint32())
         self.ownership_ticket_expires = datetime.fromtimestamp(stream.read_uint32())
 
-        self.licenses = []
-        license_count = stream.read_uint16()
-        for i in range(license_count):
-            self.licenses.append(stream.read_uint32())
+        self.licenses = [stream.read_uint32() for _ in range(stream.read_uint16())]
 
-        self.dlc = []
-        dlc_count = stream.read_uint16()
-        for i in range(dlc_count):
-            dlc = DLC()
-            dlc.app_id = stream.read_uint32()
+        self.dlc = [
+            DLC(app_id=stream.read_uint32(),
+                licenses=[stream.read_uint32() for _ in range(stream.read_uint16())]
+            ) for _ in range(stream.read_uint16())
+        ]
 
-            dlc.licenses = []
-            license_count = stream.read_uint16()
-            for j in range(license_count):
-                dlc.licenses.append(stream.read_uint32())
-            self.dlc.append(dlc)
+        stream.skip(2) # reserved
 
-        stream.seek(2, 1) # reserved
-
-        if (stream.position + 128 == stream.limit):
+        if stream.position + 128 == stream.limit:
             self.signature = ticket[stream.position : stream.position + 128]
 
     def validate(self, public_key_file_path = None) -> bool:
@@ -172,7 +191,12 @@ class AppTicket:
             return False
 
 
-class DLC:
-    def __init__(self):
-        self.app_id = None
-        self.licenses = None
+def parse_app_ticket(ticket: bytes, *, allow_invalid_signature: bool = False):
+    pass
+
+def parse_encrypted_app_ticket(ticket: bytes, encryption_key: bytes|str):
+    pass
+
+
+if __name__ == '__main__':
+    parse_app_ticket(b'test', allow_invalid_signature=True)

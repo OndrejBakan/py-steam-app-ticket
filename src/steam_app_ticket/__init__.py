@@ -43,10 +43,6 @@ class AppTicket(typing.NamedTuple):
     licenses: list[int]
     dlc: tuple[DLC]
 
-    @staticmethod
-    def parse(test):
-        print('Test')
-
 
 class ByteBuffer:
     def __init__(self, data):
@@ -87,99 +83,99 @@ class ByteBuffer:
 
 
 def parse_app_ticket(ticket: bytes, *, allow_invalid_signature: bool = False) -> AppTicket:
-        if not isinstance(ticket, bytes):
-            ticket = bytes.fromhex(ticket)
-        stream = ByteBuffer(ticket)
+    if not isinstance(ticket, bytes):
+        ticket = bytes.fromhex(ticket)
+    stream = ByteBuffer(ticket)
 
-        if stream.read_uint32() == 20:
-            # full app ticket
-            auth_ticket = ticket[stream.position - 4 : stream.position - 4 + 52]
+    if stream.read_uint32() == 20:
+        # full app ticket
+        auth_ticket = ticket[stream.position - 4:stream.position - 4 + 52]
 
-            gc_token = str(stream.read_uint64())
-            stream.skip(8) # SteamID
-            token_generated = datetime.fromtimestamp(stream.read_uint32())
-            session_header = stream.read_uint32()
-            stream.skip(4) # unknown 1
-            stream.skip(4) # unknown 2
-            session_external_ip = ip_address(stream.read_uint32())
-            stream.skip(4) # filler
-            client_connection_time = stream.read_uint32()
-            client_connection_count = stream.read_uint32()
+        gc_token = str(stream.read_uint64())
+        stream.skip(8)  # SteamID
+        token_generated = datetime.fromtimestamp(stream.read_uint32())
+        session_header = stream.read_uint32()
+        stream.skip(4)  # unknown 1
+        stream.skip(4)  # unknown 2
+        session_external_ip = ip_address(stream.read_uint32())
+        stream.skip(4)  # filler
+        client_connection_time = stream.read_uint32()
+        client_connection_count = stream.read_uint32()
 
-            if stream.read_uint32() + stream.position != stream.limit:
-                raise ValueError()
-        else:
-            stream.seek(-4, os.SEEK_CUR)
-
-        _ownership_ticket_offset = stream.position
-        _ownership_ticket_length = stream.read_uint32()
-
-        if (
-            _ownership_ticket_offset + _ownership_ticket_length != stream.limit
-        ) and (
-            _ownership_ticket_offset + _ownership_ticket_length + 128 != stream.limit
-        ):
+        if stream.read_uint32() + stream.position != stream.limit:
             raise ValueError()
+    else:
+        stream.seek(-4, os.SEEK_CUR)
 
-        version = stream.read_uint32()
-        steam_id = steamid.SteamID(str(stream.read_uint64()))
-        app_id = stream.read_uint32()
+    _ownership_ticket_offset = stream.position
+    _ownership_ticket_length = stream.read_uint32()
 
-        ownership_ticket_external_ip = ip_address(stream.read_uint32())
-        ownership_ticket_internal_ip = ip_address(stream.read_uint32())
-        ownership_flags = stream.read_uint32()
-        ownership_ticket_generated = datetime.fromtimestamp(stream.read_uint32())
-        ownership_ticket_expires = datetime.fromtimestamp(stream.read_uint32())
+    if (
+        _ownership_ticket_offset + _ownership_ticket_length != stream.limit
+    ) and (
+        _ownership_ticket_offset + _ownership_ticket_length + 128 != stream.limit
+    ):
+        raise ValueError()
 
-        licenses = [stream.read_uint32() for _ in range(stream.read_uint16())]
+    version = stream.read_uint32()
+    steam_id = steamid.SteamID(str(stream.read_uint64()))
+    app_id = stream.read_uint32()
 
-        dlc = [
-            DLC(
-                app_id=stream.read_uint32(),
-                licenses=[stream.read_uint32() for _ in range(stream.read_uint16())]
-            ) for _ in range(stream.read_uint16())
-        ]
+    ownership_ticket_external_ip = ip_address(stream.read_uint32())
+    ownership_ticket_internal_ip = ip_address(stream.read_uint32())
+    ownership_flags = stream.read_uint32()
+    ownership_ticket_generated = datetime.fromtimestamp(stream.read_uint32())
+    ownership_ticket_expires = datetime.fromtimestamp(stream.read_uint32())
 
-        stream.skip(2) # reserved
+    licenses = [stream.read_uint32() for _ in range(stream.read_uint16())]
 
-        if stream.position + 128 == stream.limit:
-            signature = ticket[stream.position : stream.position + 128]
+    dlc = [
+        DLC(
+            app_id=stream.read_uint32(),
+            licenses=[stream.read_uint32() for _ in range(stream.read_uint16())]
+        ) for _ in range(stream.read_uint16())
+    ]
 
-        if allow_invalid_signature == False:
-            public_key = serialization.load_pem_public_key(STEAM_PUBLIC_KEY)
-            try:
-                public_key.verify(
-                    signature,
-                    ticket[_ownership_ticket_offset : _ownership_ticket_offset + _ownership_ticket_length],
-                    padding.PKCS1v15(),
-                    hashes.SHA1()
-                )
-            except InvalidSignature:
-                return None
-            except Exception:
-                return None
+    stream.skip(2)  # reserved
 
-        
-        return AppTicket(**dict(
-            auth_ticket=auth_ticket,
-            gc_token= gc_token,
-            token_generated=token_generated,
-            session_external_ip=session_external_ip,
-            client_connection_time=client_connection_time,
-            client_connection_count=client_connection_count,
-            version=version,
-            steam_id=steam_id,
-            app_id=app_id,
-            ownership_ticket_external_ip=ownership_ticket_external_ip,
-            ownership_ticket_internal_ip=ownership_ticket_internal_ip,
-            ownership_flags=ownership_flags,
-            ownership_ticket_generated=ownership_ticket_generated,
-            ownership_ticket_expires=ownership_ticket_expires,
-            licenses=licenses,
-            dlc=dlc
-        ))
+    if stream.position + 128 == stream.limit:
+        signature = ticket[stream.position:stream.position + 128]
 
-def parse_encrypted_app_ticket(ticket: bytes, encryption_key: bytes|str):
+    if allow_invalid_signature is False:
+        public_key = serialization.load_pem_public_key(STEAM_PUBLIC_KEY)
+        try:
+            public_key.verify(
+                signature,
+                ticket[_ownership_ticket_offset:_ownership_ticket_offset + _ownership_ticket_length],
+                padding.PKCS1v15(),
+                hashes.SHA1()
+            )
+        except InvalidSignature:
+            return None
+        except Exception:
+            return None
+
+    return AppTicket(**dict(
+        auth_ticket=auth_ticket,
+        gc_token=gc_token,
+        token_generated=token_generated,
+        session_external_ip=session_external_ip,
+        client_connection_time=client_connection_time,
+        client_connection_count=client_connection_count,
+        version=version,
+        steam_id=steam_id,
+        app_id=app_id,
+        ownership_ticket_external_ip=ownership_ticket_external_ip,
+        ownership_ticket_internal_ip=ownership_ticket_internal_ip,
+        ownership_flags=ownership_flags,
+        ownership_ticket_generated=ownership_ticket_generated,
+        ownership_ticket_expires=ownership_ticket_expires,
+        licenses=licenses,
+        dlc=dlc
+    ))
+
+
+def parse_encrypted_app_ticket(ticket: bytes, encryption_key: bytes | str):
     raise NotImplementedError()
 
 

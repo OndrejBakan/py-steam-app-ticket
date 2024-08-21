@@ -155,7 +155,7 @@ def parse_app_ticket(ticket: bytes, *, allow_invalid_signature: bool = False) ->
         except Exception:
             return None
 
-    return AppTicket(**dict(
+    return AppTicket(
         auth_ticket=auth_ticket,
         gc_token=gc_token,
         token_generated=token_generated,
@@ -172,7 +172,7 @@ def parse_app_ticket(ticket: bytes, *, allow_invalid_signature: bool = False) ->
         ownership_ticket_expires=ownership_ticket_expires,
         licenses=licenses,
         dlc=dlc
-    ))
+    )
 
 
 def parse_encrypted_app_ticket(ticket: bytes, encryption_key: bytes | str):
